@@ -1,0 +1,49 @@
+name: fintor
+description: "Fintor - Automated SMS & Manual Expense Management App"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  permission_handler: ^11.3.1
+  fl_chart: ^0.68.0
+  intl: ^0.19.0
+  uuid: ^4.4.0
+  http: ^1.2.1
+  sqflite: ^2.3.3+1
+  sqflite_common_ffi: ^2.3.3
+  path: ^1.9.0
+  flutter_secure_storage: ^9.2.2
+  file_picker: ^8.0.3
+  csv: ^6.0.0
+  pdf: ^3.10.8                 # PDF generation
+  printing: ^5.13.1            # PDF preview and printing
+  share_plus: ^9.0.0           # Native file share sheet
+  local_auth: ^2.2.0           # Biometric authentication
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+  google_mlkit_text_recognition: ^0.13.0 # On-device OCR
+  image_picker: ^1.1.2
+  connectivity_plus: ^6.0.5
+  shared_preferences: ^2.3.2
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/icon/f1.png"
+  min_sdk_android: 21
+
+flutter:
+  uses-material-design: true
