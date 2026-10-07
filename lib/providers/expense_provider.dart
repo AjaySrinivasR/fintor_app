@@ -185,20 +185,100 @@ class ExpenseProvider extends ChangeNotifier {
         }
       }
     });
+
+    await drainOfflineNotifications(categoryProvider);
+  }
+
+  Future<void> drainOfflineNotifications(
+      CategoryProvider categoryProvider) async {
+    try {
+      final List<dynamic>? pendingList =
+          await _notifChannel.invokeMethod('getOfflinePendingNotifications');
+      if (pendingList != null && pendingList.isNotEmpty) {
+        for (final item in pendingList) {
+          final data = Map<String, dynamic>.from(item);
+          final pkg = data['package'] as String? ?? '';
+          final title = data['title'] as String? ?? '';
+          final text = data['text'] as String? ?? '';
+
+          final parsed = NotificationExpenseParser.parse(
+            packageName: pkg,
+            title: title,
+            text: text,
+            categoryProvider: categoryProvider,
+          );
+
+          if (parsed != null) {
+            final isDuplicate = _expenses.any((e) =>
+                e.amount == parsed.amount &&
+                e.date.difference(parsed.date).inMinutes.abs() < 2);
+
+            if (!isDuplicate) {
+              await addExpense(parsed);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint("Error draining offline notifications: $e");
+    }
+  }
+
+  Future<bool> isNotificationListenerEnabled() async {
+    try {
+      final bool? enabled =
+          await _notifChannel.invokeMethod('isNotificationListenerEnabled');
+      return enabled ?? false;
+    } catch (_) {
+      return false;
+    }
   }
 
   Future<void> requestNotificationListenerPermission() async {
-    await _notifChannel.invokeMethod('openNotificationSettings');
+    try {
+      await _notifChannel.invokeMethod('openNotificationSettings');
+    } catch (e) {
+      debugPrint("Error opening notification settings: $e");
+    }
   }
 
   List<Expense> _expenses = [];
   double _monthlyBudget = 30000.0;
   bool _isSmsSyncActive = false;
   String? _jwtToken;
+  DateTime _selectedMonth = DateTime.now();
 
   List<Expense> get expenses => List.unmodifiable(_expenses);
   double get monthlyBudget => _monthlyBudget;
   bool get isSmsSyncActive => _isSmsSyncActive;
+  DateTime get selectedMonth => _selectedMonth;
+
+  void setSelectedMonth(DateTime month) {
+    _selectedMonth = DateTime(month.year, month.month);
+    notifyListeners();
+  }
+
+  void previousMonth() {
+    _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month - 1);
+    notifyListeners();
+  }
+
+  void nextMonth() {
+    _selectedMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1);
+    notifyListeners();
+  }
+
+  void resetToCurrentMonth() {
+    _selectedMonth = DateTime.now();
+    notifyListeners();
+  }
+
+  List<Expense> get selectedMonthExpenses {
+    return _expenses.where((e) {
+      return e.date.year == _selectedMonth.year &&
+          e.date.month == _selectedMonth.month;
+    }).toList();
+  }
 
   double get totalSpent => _expenses
       .where((e) => e.type == TransactionType.debit)
@@ -264,6 +344,7 @@ class ExpenseProvider extends ChangeNotifier {
     if (status.isGranted) {
       _isSmsSyncActive = true;
       _channel.setMethodCallHandler(_handleNativeMethodCall);
+      await drainOfflineSms();
       notifyListeners();
     }
   }
@@ -278,7 +359,8 @@ class ExpenseProvider extends ChangeNotifier {
       if (parsedExpense != null) {
         final isDuplicate = _expenses.any((e) =>
             e.amount == parsedExpense.amount &&
-            e.date.difference(parsedExpense.date).inMinutes.abs() < 2);
+            e.title.toLowerCase() == parsedExpense.title.toLowerCase() &&
+            e.date.difference(parsedExpense.date).inMinutes.abs() < 5);
 
         if (!isDuplicate) {
           await addExpense(parsedExpense);
@@ -298,7 +380,7 @@ class ExpenseProvider extends ChangeNotifier {
     });
   }
 
-// Drain messages collected while app was closed/offline
+  // Drain messages collected while app was closed/offline
   Future<void> drainOfflineSms() async {
     try {
       final List<dynamic>? pendingList =
@@ -311,7 +393,14 @@ class ExpenseProvider extends ChangeNotifier {
 
           final parsedExpense = SmsExpenseParser.parse(sender, body);
           if (parsedExpense != null) {
-            await addExpense(parsedExpense);
+            final isDuplicate = _expenses.any((e) =>
+                e.amount == parsedExpense.amount &&
+                e.title.toLowerCase() == parsedExpense.title.toLowerCase() &&
+                e.date.difference(parsedExpense.date).inMinutes.abs() < 5);
+
+            if (!isDuplicate) {
+              await addExpense(parsedExpense);
+            }
           }
         }
       }

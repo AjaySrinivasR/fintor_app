@@ -1,4 +1,3 @@
-// lib/providers/subscription_provider.dart
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/expense_model.dart';

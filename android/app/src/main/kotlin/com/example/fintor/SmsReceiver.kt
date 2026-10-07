@@ -17,13 +17,13 @@ class SmsReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
         if (context == null || intent?.action != Telephony.Sms.Intents.SMS_RECEIVED_ACTION) return
 
-        // 1. Verify if user has enabled SMS sync
+        // 1. Verify if user has enabled SMS sync in fintor_prefs
         val appPrefs = context.getSharedPreferences("fintor_prefs", Context.MODE_PRIVATE)
         val isEnabled = appPrefs.getBoolean("sms_sync_enabled", false)
         if (!isEnabled) return
 
-        // 2. Extract messages
-        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent)
+        // 2. Extract incoming messages
+        val messages = Telephony.Sms.Intents.getMessagesFromIntent(intent) ?: return
         for (sms in messages) {
             val sender = sms.originatingAddress ?: ""
             val body = sms.messageBody ?: ""
@@ -33,12 +33,12 @@ class SmsReceiver : BroadcastReceiver() {
                         body.contains("verification code", ignoreCase = true) ||
                         body.contains("secret", ignoreCase = true)
             
-            if (!isOtp) {
+            if (!isOtp && body.isNotBlank()) {
                 if (listener != null) {
-                    // App is open in foreground
+                    // App is active / open in foreground
                     listener?.invoke(sender, body)
                 } else {
-                    // App is fully closed / killed: write straight to native disk
+                    // App is fully closed or killed: write to offline SharedPreferences queue
                     saveOfflineSms(context, sender, body)
                 }
             }
@@ -46,16 +46,20 @@ class SmsReceiver : BroadcastReceiver() {
     }
 
     private fun saveOfflineSms(context: Context, sender: String, body: String) {
-        val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-        val currentJson = prefs.getString(KEY_PENDING, "[]") ?: "[]"
-        val array = JSONArray(currentJson)
+        try {
+            val prefs = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+            val currentJson = prefs.getString(KEY_PENDING, "[]") ?: "[]"
+            val array = JSONArray(currentJson)
 
-        val obj = JSONObject().apply {
-            put("sender", sender)
-            put("body", body)
-            put("timestamp", System.currentTimeMillis())
+            val obj = JSONObject().apply {
+                put("sender", sender)
+                put("body", body)
+                put("timestamp", System.currentTimeMillis())
+            }
+            array.put(obj)
+            prefs.edit().putString(KEY_PENDING, array.toString()).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
-        array.put(obj)
-        prefs.edit().putString(KEY_PENDING, array.toString()).apply()
     }
-}
+}

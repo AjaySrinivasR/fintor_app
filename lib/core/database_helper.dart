@@ -1,4 +1,3 @@
-// Inside DatabaseHelper in mobile/lib/core/database_helper.dart
 import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 import '../models/expense_model.dart';

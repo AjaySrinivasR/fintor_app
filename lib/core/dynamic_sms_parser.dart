@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../models/expense_model.dart';
 import '../services/api_service.dart';
+import 'sms_parser.dart';
 
 class BankRule {
   final String bank;
@@ -82,7 +83,7 @@ class DynamicSmsEngine {
             id: const Uuid().v4(),
             title: merchant.trim().toUpperCase(),
             amount: double.tryParse(amtStr) ?? 0.0,
-            category: _classify(merchant),
+            category: SmsExpenseParser.categorizeExpense(merchant, body),
             type: TransactionType.debit,
             source: SourceType.sms,
             accountLast4: acc,
@@ -115,34 +116,5 @@ class DynamicSmsEngine {
     }
     return null;
   }
-
-  static String _classify(String merchant) {
-    final m = merchant.toLowerCase();
-    if (m.contains('swiggy') ||
-        m.contains('zomato') ||
-        m.contains('blinkit') ||
-        m.contains('zepto') ||
-        m.contains('rest')) {
-      return 'Food & Dining';
-    }
-    if (m.contains('uber') ||
-        m.contains('ola') ||
-        m.contains('fuel') ||
-        m.contains('hp') ||
-        m.contains('ioc')) {
-      return 'Travel & Fuel';
-    }
-    if (m.contains('amazon') ||
-        m.contains('flipkart') ||
-        m.contains('myntra')) {
-      return 'Shopping';
-    }
-    if (m.contains('netflix') || m.contains('hotstar') || m.contains('pvr')) {
-      return 'Entertainment';
-    }
-    if (m.contains('airtel') || m.contains('bescom') || m.contains('jio')) {
-      return 'Utilities';
-    }
-    return 'General';
-  }
 }
+

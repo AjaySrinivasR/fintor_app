@@ -1,4 +1,3 @@
-// lib/providers/category_provider.dart
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/category_model.dart';
@@ -69,7 +68,8 @@ class CategoryProvider extends ChangeNotifier {
         'pvr',
         'inox',
         'bookmyshow',
-        'youtube'
+        'youtube',
+        'district'
       ],
     ),
     CategoryItem(

@@ -4,20 +4,107 @@ const Category = require('../models/Category');
 // Fallback keyword classifier if category ID does not resolve
 const fallbackCategoryFromTitle = (title = '') => {
   const t = title.toLowerCase();
-  if (t.includes('biriyani') || t.includes('cafe') || t.includes('zomato') || t.includes('swiggy') || t.includes('food') || t.includes('restaurant')) {
-    return 'Dining Out';
+  if (
+    t.includes('swiggy') ||
+    t.includes('zomato') ||
+    t.includes('blinkit') ||
+    t.includes('zepto') ||
+    t.includes('instamart') ||
+    t.includes('mcdonald') ||
+    t.includes('kfc') ||
+    t.includes('dominos') ||
+    t.includes('pizza') ||
+    t.includes('burger') ||
+    t.includes('biriyani') ||
+    t.includes('biryani') ||
+    t.includes('cafe') ||
+    t.includes('coffee') ||
+    t.includes('starbucks') ||
+    t.includes('food') ||
+    t.includes('restaurant') ||
+    t.includes('dine')
+  ) {
+    return 'Food & Dining';
   }
-  if (t.includes('oil') || t.includes('petrol') || t.includes('fuel') || t.includes('uber') || t.includes('ola')) {
-    return 'Transportation';
+  if (
+    t.includes('uber') ||
+    t.includes('ola') ||
+    t.includes('rapido') ||
+    t.includes('petrol') ||
+    t.includes('fuel') ||
+    t.includes('hpcl') ||
+    t.includes('bpcl') ||
+    t.includes('ioc') ||
+    t.includes('shell') ||
+    t.includes('oil') ||
+    t.includes('metro') ||
+    t.includes('irctc') ||
+    t.includes('fastag') ||
+    t.includes('flight')
+  ) {
+    return 'Travel & Fuel';
   }
-  if (t.includes('market') || t.includes('mart') || t.includes('grocery') || t.includes('store')) {
-    return 'Groceries';
+  if (
+    t.includes('netflix') ||
+    t.includes('spotify') ||
+    t.includes('hotstar') ||
+    t.includes('prime') ||
+    t.includes('pvr') ||
+    t.includes('inox') ||
+    t.includes('bookmyshow') ||
+    t.includes('cinema') ||
+    t.includes('movie') ||
+    t.includes('youtube')
+  ) {
+    return 'Entertainment';
   }
-  if (t.includes('bescom') || t.includes('airtel') || t.includes('jio') || t.includes('bill')) {
-    return 'Utilities';
+  if (
+    t.includes('airtel') ||
+    t.includes('jio') ||
+    t.includes('vi') ||
+    t.includes('bescom') ||
+    t.includes('electricity') ||
+    t.includes('water') ||
+    t.includes('gas') ||
+    t.includes('bill') ||
+    t.includes('recharge') ||
+    t.includes('broadband') ||
+    t.includes('tata play') ||
+    t.includes('tata sky')
+  ) {
+    return 'Utilities & Bills';
+  }
+  if (
+    t.includes('zerodha') ||
+    t.includes('groww') ||
+    t.includes('upstox') ||
+    t.includes('mutual fund') ||
+    t.includes('sip') ||
+    t.includes('invest') ||
+    t.includes('kuvera') ||
+    t.includes('etmoney')
+  ) {
+    return 'Investments & SIP';
+  }
+  if (
+    t.includes('amazon') ||
+    t.includes('flipkart') ||
+    t.includes('myntra') ||
+    t.includes('ajio') ||
+    t.includes('dmart') ||
+    t.includes('bigbasket') ||
+    t.includes('market') ||
+    t.includes('mart') ||
+    t.includes('grocery') ||
+    t.includes('store') ||
+    t.includes('retail') ||
+    t.includes('mall')
+  ) {
+    return 'Shopping';
   }
   return 'General';
 };
+
 
 // 1. Fetch all expenses with category name resolution
 exports.getExpenses = async (req, res, next) => {

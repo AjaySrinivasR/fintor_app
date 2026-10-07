@@ -1,7 +1,7 @@
-import Expense from '../models/Expense.js';
-import Budget from '../models/Budget.js';
-import Category from '../models/Category.js';
-import { linearRegression, weightedAverage } from './mathUtils.js';
+const Expense = require('../models/Expense');
+const Budget = require('../models/Budget');
+const Category = require('../models/Category');
+const { linearRegression, weightedAverage } = require('./mathUtils');
 
 const MIN_MONTHS_FOR_REGRESSION = 3;
 const MIN_DAYS_FOR_ROLLING_TREND = 7; // fewer days than this -> simple run-rate instead
@@ -249,7 +249,7 @@ const forecastMonthEnd = async (userId, categoryId = null, options = {}) => {
   };
 };
 
-export {
+module.exports = {
   forecastTrend,
   forecastMonthEnd,
   computeSimpleRunRate,

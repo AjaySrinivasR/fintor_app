@@ -1,8 +1,6 @@
-import 'package:fintor/core/sms_parser.dart';
-import 'package:fintor/views/expenses/receipt_scanner.dart';
-import 'package:fintor/views/widgets/edit_expense_dialog.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -13,8 +11,11 @@ import '../providers/expense_provider.dart';
 import '../services/auth_service.dart';
 import '../services/export_service.dart';
 import 'auth/auth_screen.dart';
-import 'widgets/add_expense_dialog.dart';
 import 'expenses/csv_import_screen.dart';
+import 'expenses/receipt_scanner.dart';
+import 'widgets/add_expense_dialog.dart';
+import 'widgets/compass_icon.dart';
+import 'widgets/edit_expense_dialog.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -24,8 +25,7 @@ class DashboardScreen extends StatefulWidget {
 }
 
 class _DashboardScreenState extends State<DashboardScreen> {
-  DateTime _selectedMonth = DateTime.now();
-  String _selectedFilter = 'All'; // 'All', 'Debit', 'Credit', 'SMS'
+  String _selectedFilter = 'All'; // 'All', 'Debit', 'Credit', 'SMS', 'CSV'
   int _touchedChartIndex = -1;
   bool _isSmsSyncEnabled = false;
 
@@ -38,7 +38,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
     _loadSmsSyncPreference();
   }
 
-  // Inside _DashboardScreenState in lib/views/dashboard_screen.dart:
   Future<void> _loadSmsSyncPreference() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -47,7 +46,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isSmsSyncEnabled = enabled;
     });
 
-    // If enabled previously, activate the foreground receiver listener
     if (enabled) {
       context.read<ExpenseProvider>().initializeSmsListener();
     }
@@ -62,7 +60,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
       _isSmsSyncEnabled = value;
     });
 
-    // Notify native Android whether to process incoming SMS in the background
     const platform = MethodChannel('com.fintor.app/sms');
     await platform.invokeMethod('setSmsSyncEnabled', {'enabled': value});
   }
@@ -70,18 +67,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<ExpenseProvider>();
+    final selectedMonth = provider.selectedMonth;
 
     // Filter transactions by selected month & year
-    final monthExpenses = provider.expenses.where((e) {
-      return e.date.year == _selectedMonth.year &&
-          e.date.month == _selectedMonth.month;
-    }).toList();
+    final monthExpenses = provider.selectedMonthExpenses;
 
-    // Filter by transaction type
+    // Filter by transaction type / source
     final filteredExpenses = monthExpenses.where((e) {
       if (_selectedFilter == 'Debit') return e.type == TransactionType.debit;
       if (_selectedFilter == 'Credit') return e.type == TransactionType.credit;
       if (_selectedFilter == 'SMS') return e.source == SourceType.sms;
+      if (_selectedFilter == 'CSV') return e.source == SourceType.csv;
       return true;
     }).toList();
 
@@ -95,6 +91,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         .fold(0.0, (sum, item) => sum + item.amount);
 
     final netSavings = monthlyCredit - monthlyDebit;
+    final savingsRate = monthlyCredit > 0
+        ? ((netSavings / monthlyCredit) * 100).clamp(-100.0, 100.0)
+        : 0.0;
 
     // Compute category breakdown for the selected month
     final Map<String, double> categoryBreakdown = {};
@@ -103,37 +102,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
           (categoryBreakdown[e.category] ?? 0.0) + e.amount;
     }
 
+    final now = DateTime.now();
+    final isCurrentMonth =
+        selectedMonth.year == now.year && selectedMonth.month == now.month;
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
         title: Row(
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
+              padding: const EdgeInsets.all(7),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E3A8A).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E3A8A), Color(0xFF2563EB)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF1E3A8A).withOpacity(0.25),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
               ),
-              child: const Icon(Icons.account_balance_wallet_rounded,
-                  color: Color(0xFF1E3A8A), size: 22),
+              child: const CompassIcon(color: Colors.white, size: 20),
             ),
             const SizedBox(width: 10),
-            const Text(
+            Text(
               'Fintor',
-              style: TextStyle(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 20,
-                  letterSpacing: -0.5),
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                letterSpacing: -0.5,
+                color: const Color(0xFF0F172A),
+              ),
             ),
           ],
         ),
         actions: [
-          // In AppBar actions of lib/views/dashboard_screen.dart:
           IconButton(
             icon: Icon(
               _isSmsSyncEnabled
                   ? Icons.sync_rounded
                   : Icons.sync_disabled_rounded,
-              color: _isSmsSyncEnabled ? Colors.green.shade600 : Colors.grey,
+              color: _isSmsSyncEnabled
+                  ? const Color(0xFF059669)
+                  : const Color(0xFF94A3B8),
             ),
             tooltip: _isSmsSyncEnabled
                 ? 'Background SMS Sync Active'
@@ -141,7 +158,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
             onPressed: () => _toggleSmsSync(!_isSmsSyncEnabled),
           ),
           IconButton(
-            icon: const Icon(Icons.file_upload_outlined),
+            icon: const Icon(Icons.document_scanner_outlined,
+                color: Color(0xFF1E3A8A)),
+            tooltip: 'Scan Receipt OCR',
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const ReceiptScannerScreen()),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.file_upload_outlined,
+                color: Color(0xFF334155)),
             tooltip: 'Import Bank CSV',
             onPressed: () => Navigator.push(
               context,
@@ -149,32 +176,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.share_outlined),
+            icon: const Icon(Icons.ios_share_rounded, color: Color(0xFF334155)),
             tooltip: 'Export Statement',
             onPressed: () => _showExportSheet(
                 context, monthExpenses, monthlyDebit, monthlyCredit),
           ),
-          // Inside DashboardScreen AppBar actions:
-          IconButton(
-            icon: const Icon(Icons.document_scanner_outlined),
-            tooltip: 'Scan Receipt OCR',
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const ReceiptScannerScreen()),
-            ),
-          ),
-          // Test button inside Dashboard actions:
-          // IconButton(
-          //   icon: const Icon(Icons.bug_report),
-          //   onPressed: () {
-          //     const testSms =
-          //         "Your A/c No.XXXX is credited with Rs.500.00 on 06-09-2026 07:50 PM and A/c linked to xxxx@okaxis is debited (UPI Ref No. xxxxxxx).Current AVBL bal is Rs.xxxxxxx - TMB";
-          //     final exp = SmsExpenseParser.parse("TMBLTD", testSms);
-          //     if (exp != null) {
-          //       context.read<ExpenseProvider>().addExpense(exp);
-          //     }
-          //   },
-          // ),
           IconButton(
             icon: Icon(Icons.logout_rounded, color: Colors.red.shade600),
             tooltip: 'Log Out',
@@ -183,117 +189,119 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ],
       ),
       body: RefreshIndicator(
+        color: const Color(0xFF1E3A8A),
+        backgroundColor: Colors.white,
         onRefresh: () async {
           await provider.loadLocalExpenses();
           await provider.syncPendingExpenses();
+          await provider.drainOfflineSms();
         },
-        child: SingleChildScrollView(
+        child: ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. Month Selector Bar
-              _buildMonthSelector(),
-              const SizedBox(height: 16),
+          padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+          children: [
+            // 1. Month Selector Bar
+            _buildMonthSelector(provider, isCurrentMonth),
+            const SizedBox(height: 16),
 
-              // 2. High-Level Metrics (Stats Cards)
-              Row(
-                children: [
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Total Spent',
-                      value: currencyFormatter.format(monthlyDebit),
-                      icon: Icons.arrow_outward_rounded,
-                      color: Colors.red.shade600,
-                      bgColor: Colors.red.shade50,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Total Income',
-                      value: currencyFormatter.format(monthlyCredit),
-                      icon: Icons.south_west_rounded,
-                      color: Colors.green.shade700,
-                      bgColor: Colors.green.shade50,
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _MetricCard(
-                      title: 'Net Savings',
-                      value: currencyFormatter.format(netSavings),
-                      icon: Icons.savings_outlined,
-                      color: netSavings >= 0
-                          ? const Color(0xFF1E3A8A)
-                          : Colors.orange.shade800,
-                      bgColor: const Color(0xFFEFF6FF),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 14),
+            // 2. High-Level Hero Cash Flow & Net Savings Card
+            _buildCashFlowHero(
+              monthlyDebit: monthlyDebit,
+              monthlyCredit: monthlyCredit,
+              netSavings: netSavings,
+              savingsRate: savingsRate,
+              budget: provider.monthlyBudget,
+            ),
+            const SizedBox(height: 14),
 
-              // 3. Overall Monthly Limit Progress Bar
-              _BudgetProgressBar(
-                spent: monthlyDebit,
-                budget: provider.monthlyBudget,
+            // 3. Overall Monthly Budget Progress Bar
+            _buildBudgetProgressBar(
+              spent: monthlyDebit,
+              budget: provider.monthlyBudget,
+              onEditBudget: () => _showEditBudgetDialog(context, provider),
+            ),
+            const SizedBox(height: 20),
+
+            // 4. Category Spending Distribution Chart (if debit expenses exist)
+            if (categoryBreakdown.isNotEmpty) ...[
+              _buildSectionHeader('Spending Distribution'),
+              const SizedBox(height: 10),
+              _CategoryChartCard(
+                breakdown: categoryBreakdown,
+                totalSpent: monthlyDebit,
+                touchedIndex: _touchedChartIndex,
+                onChartTouch: (index) =>
+                    setState(() => _touchedChartIndex = index),
                 formatter: currencyFormatter,
-                onEditBudget: () => _showEditBudgetDialog(context, provider),
               ),
               const SizedBox(height: 20),
+            ],
 
-              // 4. Category Spending Distribution Chart
-              if (categoryBreakdown.isNotEmpty) ...[
-                _buildSectionHeader('Spending Distribution'),
-                const SizedBox(height: 10),
-                _CategoryChartCard(
-                  breakdown: categoryBreakdown,
-                  totalSpent: monthlyDebit,
-                  touchedIndex: _touchedChartIndex,
-                  onChartTouch: (index) =>
-                      setState(() => _touchedChartIndex = index),
-                  formatter: currencyFormatter,
+            // 5. Transaction Ledger & Filter Chips
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildSectionHeader(
+                    'Transactions (${filteredExpenses.length})'),
+                Text(
+                  currencyFormatter.format(monthlyDebit),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF64748B),
+                  ),
                 ),
-                const SizedBox(height: 20),
               ],
+            ),
+            const SizedBox(height: 10),
 
-              // 5. Transaction Ledger & Filter Chips
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // Filter Chips Carousel
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
                 children: [
-                  _buildSectionHeader(
-                      'Transactions (${filteredExpenses.length})'),
-                  _buildFilterDropdown(),
+                  _buildFilterPill('All (${monthExpenses.length})', 'All'),
+                  const SizedBox(width: 8),
+                  _buildFilterPill(
+                    'Expenses (${monthExpenses.where((e) => e.type == TransactionType.debit).length})',
+                    'Debit',
+                    activeColor: Colors.red.shade600,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterPill(
+                    'Income (${monthExpenses.where((e) => e.type == TransactionType.credit).length})',
+                    'Credit',
+                    activeColor: const Color(0xFF059669),
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterPill(
+                    'SMS Auto (${monthExpenses.where((e) => e.source == SourceType.sms).length})',
+                    'SMS',
+                    icon: Icons.sms_outlined,
+                  ),
+                  const SizedBox(width: 8),
+                  _buildFilterPill(
+                    'CSV (${monthExpenses.where((e) => e.source == SourceType.csv).length})',
+                    'CSV',
+                    icon: Icons.table_chart_outlined,
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
+            ),
+            const SizedBox(height: 12),
 
-              // 6. Transaction List / Table Replacement
-              if (filteredExpenses.isEmpty)
-                _buildEmptyState()
-              else
-                ListView.separated(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: filteredExpenses.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: Color(0xFFF1F5F9)),
-                  itemBuilder: (context, index) {
-                    final item = filteredExpenses[index];
-                    return _TransactionListTile(
-                      expense: item,
-                      formatter: currencyFormatter,
-                      onDelete: () => provider.deleteExpense(item.id),
-                    );
-                  },
-                ),
-              const SizedBox(
-                  height:
-                      140), // Padding for FloatingActionButton & Floating Nav Bar
-            ],
-          ),
+            // 6. Transaction Ledger Cards
+            if (filteredExpenses.isEmpty)
+              _buildEmptyState()
+            else
+              ...filteredExpenses.map((item) {
+                return _TransactionListTile(
+                  expense: item,
+                  formatter: currencyFormatter,
+                  onDelete: () => provider.deleteExpense(item.id),
+                );
+              }),
+          ],
         ),
       ),
       floatingActionButton: Padding(
@@ -305,9 +313,10 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           backgroundColor: const Color(0xFF1E3A8A),
           foregroundColor: Colors.white,
+          elevation: 2,
           icon: const Icon(Icons.add_rounded),
           label: const Text('Add Spend',
-              style: TextStyle(fontWeight: FontWeight.w600)),
+              style: TextStyle(fontWeight: FontWeight.w700)),
         ),
       ),
     );
@@ -315,49 +324,435 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   // --- SUB-WIDGET BUILDERS ---
 
-  Widget _buildMonthSelector() {
+  Widget _buildMonthSelector(ExpenseProvider provider, bool isCurrentMonth) {
     final dateFormat = DateFormat('MMMM yyyy');
-    return Card(
-      elevation: 0,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      color: Colors.white,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.chevron_left_rounded),
-              onPressed: () {
-                setState(() {
-                  _selectedMonth =
-                      DateTime(_selectedMonth.year, _selectedMonth.month - 1);
-                });
-              },
-            ),
-            Row(
-              children: [
-                const Icon(Icons.calendar_today_rounded,
-                    size: 16, color: Color(0xFF1E3A8A)),
+    final selectedMonth = provider.selectedMonth;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          IconButton(
+            icon: const Icon(Icons.chevron_left_rounded,
+                color: Color(0xFF1E3A8A)),
+            onPressed: () => provider.previousMonth(),
+          ),
+          Row(
+            children: [
+              const Icon(Icons.calendar_month_rounded,
+                  size: 16, color: Color(0xFF1E3A8A)),
+              const SizedBox(width: 8),
+              Text(
+                dateFormat.format(selectedMonth),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              if (!isCurrentMonth) ...[
                 const SizedBox(width: 8),
-                Text(
-                  dateFormat.format(_selectedMonth),
-                  style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15),
+                GestureDetector(
+                  onTap: () => provider.resetToCurrentMonth(),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: const Text(
+                      'Today',
+                      style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1E3A8A)),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          IconButton(
+            icon: const Icon(Icons.chevron_right_rounded,
+                color: Color(0xFF1E3A8A)),
+            onPressed: () => provider.nextMonth(),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCashFlowHero({
+    required double monthlyDebit,
+    required double monthlyCredit,
+    required double netSavings,
+    required double savingsRate,
+    required double budget,
+  }) {
+    final isPositive = netSavings >= 0;
+    final totalFlow = monthlyCredit + monthlyDebit;
+    final double incomeRatio =
+        totalFlow > 0 ? (monthlyCredit / totalFlow).clamp(0.05, 0.95) : 0.5;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF0F172A).withOpacity(0.03),
+            blurRadius: 14,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1. Header & Status Pill
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.swap_vert_rounded,
+                        size: 15,
+                        color: Color(0xFF1E3A8A),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Net Cash Flow',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B),
+                        letterSpacing: 0.1,
+                      ),
+                    ),
+                  ],
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 9, vertical: 3.5),
+                  decoration: BoxDecoration(
+                    color: isPositive
+                        ? const Color(0xFFECFDF5)
+                        : const Color(0xFFFFF1F2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isPositive
+                          ? const Color(0xFFA7F3D0)
+                          : const Color(0xFFFECDD3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isPositive
+                            ? Icons.trending_up_rounded
+                            : Icons.trending_down_rounded,
+                        size: 13,
+                        color: isPositive
+                            ? const Color(0xFF059669)
+                            : const Color(0xFFE11D48),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        monthlyCredit > 0
+                            ? (isPositive
+                                ? '+${savingsRate.toStringAsFixed(0)}% saved'
+                                : '${savingsRate.abs().toStringAsFixed(0)}% deficit')
+                            : (isPositive ? 'Surplus' : 'Deficit'),
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isPositive
+                              ? const Color(0xFF059669)
+                              : const Color(0xFFE11D48),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            IconButton(
-              icon: const Icon(Icons.chevron_right_rounded),
-              onPressed: () {
-                setState(() {
-                  _selectedMonth =
-                      DateTime(_selectedMonth.year, _selectedMonth.month + 1);
-                });
-              },
+          ),
+
+          const SizedBox(height: 12),
+
+          // 2. Main Hero Net Amount
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            child: Text(
+              (isPositive && netSavings > 0 ? '+' : '') +
+                  currencyFormatter.format(netSavings),
+              style: GoogleFonts.plusJakartaSans(
+                fontSize: 30,
+                fontWeight: FontWeight.w800,
+                color: const Color(0xFF0F172A),
+                letterSpacing: -0.8,
+              ),
             ),
-          ],
+          ),
+
+          const SizedBox(height: 14),
+
+          // 3. Proportional Cash Flow Bar (if activity exists)
+          if (totalFlow > 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  height: 4,
+                  child: Row(
+                    children: [
+                      Expanded(
+                        flex: (incomeRatio * 100).round().clamp(1, 99),
+                        child: Container(color: const Color(0xFF059669)),
+                      ),
+                      const SizedBox(width: 2),
+                      Expanded(
+                        flex: ((1 - incomeRatio) * 100).round().clamp(1, 99),
+                        child: Container(color: const Color(0xFFE11D48)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 14),
+
+          // 4. Inflow & Outflow Docked Tray
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.vertical(bottom: Radius.circular(21)),
+              border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+            ),
+            child: Row(
+              children: [
+                // Inflow Column
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFECFDF5),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.south_west_rounded,
+                          size: 14,
+                          color: Color(0xFF059669),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Inflow',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              currencyFormatter.format(monthlyCredit),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Container(width: 1, height: 26, color: const Color(0xFFE2E8F0)),
+                const SizedBox(width: 14),
+
+                // Outflow Column
+                Expanded(
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.north_east_rounded,
+                          size: 14,
+                          color: Color(0xFFE11D48),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Outflow',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                            const SizedBox(height: 1),
+                            Text(
+                              currencyFormatter.format(monthlyDebit),
+                              style: GoogleFonts.plusJakartaSans(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                color: const Color(0xFF0F172A),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBudgetProgressBar({
+    required double spent,
+    required double budget,
+    required VoidCallback onEditBudget,
+  }) {
+    final ratio = (spent / (budget > 0 ? budget : 1)).clamp(0.0, 1.0);
+    final isExceeded = spent > budget && budget > 0;
+
+    Color barColor = const Color(0xFF1E3A8A);
+    if (ratio > 0.8) barColor = Colors.orange.shade700;
+    if (isExceeded) barColor = Colors.red.shade600;
+
+    return Container(
+      padding: const EdgeInsets.all(16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: isExceeded ? Colors.red.shade200 : const Color(0xFFE2E8F0),
+          width: isExceeded ? 1.5 : 1.0,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(Icons.pie_chart_outline_rounded,
+                        size: 16, color: Color(0xFF1E3A8A)),
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('Monthly Limit',
+                      style: TextStyle(
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          color: Color(0xFF0F172A))),
+                  const SizedBox(width: 6),
+                  GestureDetector(
+                    onTap: onEditBudget,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF1F5F9),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.edit_outlined,
+                          size: 13, color: Color(0xFF64748B)),
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '${currencyFormatter.format(spent)} / ${currencyFormatter.format(budget)}',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: isExceeded
+                      ? Colors.red.shade700
+                      : const Color(0xFF475569),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: ratio,
+              minHeight: 8,
+              color: barColor,
+              backgroundColor: const Color(0xFFF1F5F9),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -367,71 +762,98 @@ class _DashboardScreenState extends State<DashboardScreen> {
       title,
       style: const TextStyle(
         fontSize: 16,
-        fontWeight: FontWeight.w700,
+        fontWeight: FontWeight.w800,
         color: Color(0xFF0F172A),
         letterSpacing: -0.3,
       ),
     );
   }
 
-  Widget _buildFilterDropdown() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-      ),
-      child: DropdownButtonHideUnderline(
-        child: DropdownButton<String>(
-          value: _selectedFilter,
-          isDense: true,
-          style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF1E3A8A),
-              fontWeight: FontWeight.w600),
-          items: const [
-            DropdownMenuItem(value: 'All', child: Text('All Types')),
-            DropdownMenuItem(value: 'Debit', child: Text('Expenses Only')),
-            DropdownMenuItem(value: 'Credit', child: Text('Income Only')),
-            DropdownMenuItem(value: 'SMS', child: Text('Auto SMS Only')),
+  Widget _buildFilterPill(String label, String value,
+      {Color? activeColor, IconData? icon}) {
+    final isSelected = _selectedFilter == value;
+    final color = activeColor ?? const Color(0xFF1E3A8A);
+
+    return InkWell(
+      onTap: () => setState(() => _selectedFilter = value),
+      borderRadius: BorderRadius.circular(20),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? color : Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? color : const Color(0xFFE2E8F0),
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: color.withOpacity(0.2),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (icon != null) ...[
+              Icon(icon,
+                  size: 14,
+                  color: isSelected ? Colors.white : const Color(0xFF64748B)),
+              const SizedBox(width: 5),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isSelected ? Colors.white : const Color(0xFF475569),
+              ),
+            ),
           ],
-          onChanged: (val) {
-            if (val != null) setState(() => _selectedFilter = val);
-          },
         ),
       ),
     );
   }
 
   Widget _buildEmptyState() {
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 36.0, horizontal: 20.0),
-        child: Center(
-          child: Column(
-            children: [
-              Icon(Icons.receipt_long_outlined,
-                  size: 48, color: Colors.grey.shade400),
-              const SizedBox(height: 12),
-              const Text(
-                'No transactions found for this period',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                    color: Color(0xFF334155)),
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 40.0, horizontal: 20.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+      ),
+      child: Center(
+        child: Column(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF1F5F9),
+                borderRadius: BorderRadius.circular(16),
               ),
-              const SizedBox(height: 4),
-              Text(
-                'Add an expense manually, import CSV, or wait for SMS sync.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-            ],
-          ),
+              child: Icon(Icons.receipt_long_outlined,
+                  size: 36, color: Colors.grey.shade400),
+            ),
+            const SizedBox(height: 14),
+            const Text(
+              'No transactions found',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 15,
+                  color: Color(0xFF334155)),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Add an expense manually, scan a receipt, or wait for SMS sync.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+            ),
+          ],
         ),
       ),
     );
@@ -443,19 +865,30 @@ class _DashboardScreenState extends State<DashboardScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Set Monthly Budget Limit'),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('Set Monthly Budget Limit',
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
         content: TextField(
           controller: controller,
+          autofocus: true,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
-            labelText: 'Total Budget (₹)',
+          decoration: InputDecoration(
+            labelText: 'Total Monthly Limit',
             prefixText: '₹ ',
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF1E3A8A),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () {
               final budget = double.tryParse(controller.text.trim()) ??
                   provider.monthlyBudget;
@@ -475,16 +908,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final shouldLogout = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: const Row(
           children: [
             Icon(Icons.logout_rounded, color: Colors.red),
             SizedBox(width: 10),
-            Text('Log Out'),
+            Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
           ],
         ),
         content: const Text(
-          'Are you sure you want to log out of Fintor? You will need to log in again to sync your transactions.',
+          'Are you sure you want to log out of Fintor? Your synced data is safely backed up.',
         ),
         actions: [
           TextButton(
@@ -494,6 +927,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor: Colors.red.shade600,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('Log Out'),
@@ -521,29 +956,56 @@ class _DashboardScreenState extends State<DashboardScreen> {
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFE2E8F0),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               const Text(
                 'Export Financial Statement',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 18,
+                    color: Color(0xFF0F172A)),
+              ),
+              const Text(
+                'Generate formatted transaction reports for taxes or personal backup',
+                style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
               ),
               const SizedBox(height: 16),
               ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFFEF2F2),
-                  child: Icon(Icons.picture_as_pdf, color: Colors.red),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFEF2F2),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.picture_as_pdf_rounded,
+                      color: Colors.red, size: 22),
                 ),
                 title: const Text('Export as PDF Document',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
-                subtitle:
-                    const Text('Formal ledger with summaries & category split'),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: const Text(
+                    'Formal statement with category breakdowns & summaries',
+                    style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
                   ExportService.exportPdfStatement(
@@ -554,14 +1016,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 },
               ),
               ListTile(
-                leading: const CircleAvatar(
-                  backgroundColor: Color(0xFFF0FDF4),
-                  child: Icon(Icons.table_chart, color: Colors.green),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0FDF4),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.table_chart_rounded,
+                      color: Colors.green, size: 22),
                 ),
                 title: const Text('Export as CSV Spreadsheet',
-                    style: TextStyle(fontWeight: FontWeight.w600)),
+                    style:
+                        TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                 subtitle: const Text(
-                    'Raw ledger compatible with Excel / Google Sheets'),
+                    'Compatible with Microsoft Excel, Google Sheets, & Apple Numbers',
+                    style: TextStyle(fontSize: 12)),
                 onTap: () {
                   Navigator.pop(ctx);
                   ExportService.exportCsvStatement(expenses);
@@ -576,141 +1047,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
 }
 
 // --- REUSABLE COMPONENTS ---
-
-class _MetricCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final IconData icon;
-  final Color color;
-  final Color bgColor;
-
-  const _MetricCard({
-    required this.title,
-    required this.value,
-    required this.icon,
-    required this.color,
-    required this.bgColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 10),
-      decoration: BoxDecoration(
-        color: bgColor,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.15)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Flexible(
-                child: Text(
-                  title,
-                  style: TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w600, color: color),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-              Icon(icon, size: 14, color: color),
-            ],
-          ),
-          const SizedBox(height: 6),
-          FittedBox(
-            fit: BoxFit.scaleDown,
-            child: Text(
-              value,
-              style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w800, color: color),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _BudgetProgressBar extends StatelessWidget {
-  final double spent;
-  final double budget;
-  final NumberFormat formatter;
-  final VoidCallback onEditBudget;
-
-  const _BudgetProgressBar({
-    required this.spent,
-    required this.budget,
-    required this.formatter,
-    required this.onEditBudget,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final ratio = (spent / (budget > 0 ? budget : 1)).clamp(0.0, 1.0);
-    final isExceeded = spent > budget;
-
-    Color barColor = const Color(0xFF1E3A8A);
-    if (ratio > 0.8) barColor = Colors.orange.shade700;
-    if (isExceeded) barColor = Colors.red.shade600;
-
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(
-            color: isExceeded ? Colors.red.shade200 : const Color(0xFFE2E8F0)),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14.0),
-        child: Column(
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Text('Monthly Limit',
-                        style: TextStyle(
-                            fontWeight: FontWeight.w700, fontSize: 13)),
-                    const SizedBox(width: 4),
-                    GestureDetector(
-                      onTap: onEditBudget,
-                      child: Icon(Icons.edit,
-                          size: 14, color: Colors.grey.shade600),
-                    ),
-                  ],
-                ),
-                Text(
-                  '${formatter.format(spent)} / ${formatter.format(budget)}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: isExceeded
-                        ? Colors.red.shade700
-                        : const Color(0xFF475569),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: LinearProgressIndicator(
-                value: ratio,
-                minHeight: 8,
-                color: barColor,
-                backgroundColor: const Color(0xFFF1F5F9),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
 
 class _CategoryChartCard extends StatelessWidget {
   final Map<String, double> breakdown;
@@ -736,87 +1072,99 @@ class _CategoryChartCard extends StatelessWidget {
       const Color(0xFF10B981),
       const Color(0xFF8B5CF6),
       const Color(0xFFEC4899),
+      const Color(0xFF0D9488),
       const Color(0xFF64748B),
     ];
 
-    return Card(
-      elevation: 0,
-      color: Colors.white,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            SizedBox(
-              height: 180,
-              child: PieChart(
-                PieChartData(
-                  pieTouchData: PieTouchData(
-                    touchCallback: (FlTouchEvent event, pieTouchResponse) {
-                      if (!event.isInterestedForInteractions ||
-                          pieTouchResponse == null ||
-                          pieTouchResponse.touchedSection == null) {
-                        onChartTouch(-1);
-                        return;
-                      }
-                      onChartTouch(
-                          pieTouchResponse.touchedSection!.touchedSectionIndex);
-                    },
-                  ),
-                  sectionsSpace: 3,
-                  centerSpaceRadius: 46,
-                  sections: List.generate(categories.length, (i) {
-                    final isTouched = i == touchedIndex;
-                    final category = categories[i];
-                    final amount = breakdown[category]!;
-                    final color = chartColors[i % chartColors.length];
-
-                    return PieChartSectionData(
-                      color: color,
-                      value: amount,
-                      title: isTouched
-                          ? '${((amount / totalSpent) * 100).toStringAsFixed(0)}%'
-                          : '',
-                      radius: isTouched ? 34.0 : 28.0,
-                      titleStyle: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    );
-                  }),
+    return Container(
+      padding: const EdgeInsets.all(18.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.02),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          SizedBox(
+            height: 180,
+            child: PieChart(
+              PieChartData(
+                pieTouchData: PieTouchData(
+                  touchCallback: (FlTouchEvent event, pieTouchResponse) {
+                    if (!event.isInterestedForInteractions ||
+                        pieTouchResponse == null ||
+                        pieTouchResponse.touchedSection == null) {
+                      onChartTouch(-1);
+                      return;
+                    }
+                    onChartTouch(
+                        pieTouchResponse.touchedSection!.touchedSectionIndex);
+                  },
                 ),
+                sectionsSpace: 3,
+                centerSpaceRadius: 46,
+                sections: List.generate(categories.length, (i) {
+                  final isTouched = i == touchedIndex;
+                  final category = categories[i];
+                  final amount = breakdown[category]!;
+                  final color = chartColors[i % chartColors.length];
+
+                  return PieChartSectionData(
+                    color: color,
+                    value: amount,
+                    title: isTouched
+                        ? '${((amount / (totalSpent > 0 ? totalSpent : 1)) * 100).toStringAsFixed(0)}%'
+                        : '',
+                    radius: isTouched ? 34.0 : 28.0,
+                    titleStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  );
+                }),
               ),
             ),
-            const SizedBox(height: 12),
-            // Legends Grid
-            Wrap(
-              spacing: 12,
-              runSpacing: 6,
-              alignment: WrapAlignment.center,
-              children: List.generate(categories.length, (i) {
-                final category = categories[i];
-                final amount = breakdown[category]!;
-                final color = chartColors[i % chartColors.length];
+          ),
+          const SizedBox(height: 14),
+          // Legends Grid
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: List.generate(categories.length, (i) {
+              final category = categories[i];
+              final amount = breakdown[category]!;
+              final color = chartColors[i % chartColors.length];
 
-                return Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                        width: 8,
-                        height: 8,
-                        decoration: BoxDecoration(
-                            color: color, shape: BoxShape.circle)),
-                    const SizedBox(width: 4),
-                    Text('$category (${formatter.format(amount)})',
-                        style: const TextStyle(
-                            fontSize: 11, color: Color(0xFF475569))),
-                  ],
-                );
-              }),
-            ),
-          ],
-        ),
+              return Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                      width: 8,
+                      height: 8,
+                      decoration:
+                          BoxDecoration(color: color, shape: BoxShape.circle)),
+                  const SizedBox(width: 5),
+                  Text(
+                    '$category (${formatter.format(amount)})',
+                    style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: Color(0xFF475569)),
+                  ),
+                ],
+              );
+            }),
+          ),
+        ],
       ),
     );
   }
@@ -837,6 +1185,7 @@ class _TransactionListTile extends StatelessWidget {
     return showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Delete Transaction?'),
         content: Text(
           'Are you sure you want to delete "${expense.title}" for ${formatter.format(expense.amount)}?',
@@ -867,103 +1216,121 @@ class _TransactionListTile extends StatelessWidget {
       confirmDismiss: (_) => _confirmDelete(context),
       onDismissed: (_) => onDelete(),
       background: Container(
-        color: Colors.red.shade600,
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.red.shade600,
+          borderRadius: BorderRadius.circular(16),
+        ),
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
         child: const Icon(Icons.delete_outline, color: Colors.white, size: 24),
       ),
-      child: Material(
-        color: Colors.white,
-        child: InkWell(
-          onTap: () => showDialog(
-            context: context,
-            builder: (_) => EditExpenseDialog(expense: expense),
-          ),
-          onLongPress: () async {
-            final shouldDelete = await _confirmDelete(context);
-            if (shouldDelete == true) onDelete();
-          },
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor:
-                      isDebit ? Colors.red.shade50 : Colors.green.shade50,
-                  child: Icon(
-                    expense.source == SourceType.sms
-                        ? Icons.sms_outlined
-                        : expense.source == SourceType.csv
-                            ? Icons.description_outlined
-                            : Icons.edit_outlined,
-                    color:
-                        isDebit ? Colors.red.shade600 : Colors.green.shade700,
-                    size: 18,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            borderRadius: BorderRadius.circular(16),
+            onTap: () => showDialog(
+              context: context,
+              builder: (_) => EditExpenseDialog(expense: expense),
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color:
+                          isDebit ? Colors.red.shade50 : Colors.green.shade50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      expense.source == SourceType.sms
+                          ? Icons.sms_outlined
+                          : expense.source == SourceType.csv
+                              ? Icons.description_outlined
+                              : Icons.edit_outlined,
+                      color:
+                          isDebit ? Colors.red.shade600 : Colors.green.shade700,
+                      size: 18,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        expense.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.w600,
-                          fontSize: 14,
-                          color: Color(0xFF0F172A),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          expense.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                            color: Color(0xFF0F172A),
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Flexible(
-                            child: Text(
-                              expense.category,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: Color(0xFF64748B),
-                                fontWeight: FontWeight.w500,
+                        const SizedBox(height: 3),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1.5),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF1F5F9),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                expense.category,
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF475569),
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
-                          ),
-                          if (expense.accountLast4 != null) ...[
-                            const Text(' • ',
-                                style: TextStyle(color: Color(0xFF94A3B8))),
+                            if (expense.accountLast4 != null &&
+                                expense.accountLast4!.isNotEmpty) ...[
+                              const SizedBox(width: 6),
+                              Text(
+                                '*${expense.accountLast4}',
+                                style: const TextStyle(
+                                    fontSize: 11, color: Color(0xFF64748B)),
+                              ),
+                            ],
+                            const SizedBox(width: 6),
                             Text(
-                              'A/c *${expense.accountLast4}',
+                              dateFormat.format(expense.date),
                               style: const TextStyle(
-                                  fontSize: 11, color: Color(0xFF64748B)),
+                                  fontSize: 11, color: Color(0xFF94A3B8)),
                             ),
                           ],
-                          const Text(' • ',
-                              style: TextStyle(color: Color(0xFF94A3B8))),
-                          Text(
-                            dateFormat.format(expense.date),
-                            style: const TextStyle(
-                                fontSize: 11, color: Color(0xFF94A3B8)),
-                          ),
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${isDebit ? '-' : '+'} ${formatter.format(expense.amount)}',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontSize: 14,
-                    color:
-                        isDebit ? Colors.red.shade700 : Colors.green.shade700,
+                  const SizedBox(width: 8),
+                  Text(
+                    '${isDebit ? '-' : '+'} ${formatter.format(expense.amount)}',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 15,
+                      color: isDebit
+                          ? Colors.red.shade700
+                          : const Color(0xFF059669),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -971,114 +1338,3 @@ class _TransactionListTile extends StatelessWidget {
     );
   }
 }
-// class _TransactionListTile extends StatelessWidget {
-//   final Expense expense;
-//   final NumberFormat formatter;
-//   final VoidCallback onDelete;
-
-//   const _TransactionListTile({
-//     required this.expense,
-//     required this.formatter,
-//     required this.onDelete,
-//   });
-
-//   void _confirmDelete(BuildContext context) {
-//     showDialog(
-//       context: context,
-//       builder: (ctx) => AlertDialog(
-//         title: const Text('Delete Transaction?'),
-//         content: Text(
-//             'Are you sure you want to delete "${expense.title}" for ${formatter.format(expense.amount)}?'),
-//         actions: [
-//           TextButton(
-//               onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-//           FilledButton(
-//             style: FilledButton.styleFrom(backgroundColor: Colors.red),
-//             onPressed: () {
-//               Navigator.pop(ctx);
-//               onDelete();
-//             },
-//             child: const Text('Delete'),
-//           ),
-//         ],
-//       ),
-//     );
-//   }
-
-//   @override
-//   Widget build(BuildContext context) {
-//     final isDebit = expense.type == TransactionType.debit;
-//     final dateFormat = DateFormat('dd MMM, hh:mm a');
-
-//     return InkWell(
-//       onTap: () => showDialog(
-//         context: context,
-//         builder: (_) => EditExpenseDialog(expense: expense),
-//       ),
-//       onLongPress: () => _confirmDelete(context),
-//       child: Container(
-//         color: Colors.white,
-//         child: ListTile(
-//           contentPadding:
-//               const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-//           leading: CircleAvatar(
-//             radius: 20,
-//             backgroundColor:
-//                 isDebit ? Colors.red.shade50 : Colors.green.shade50,
-//             child: Icon(
-//               expense.source == SourceType.sms
-//                   ? Icons.sms_outlined
-//                   : expense.source == SourceType.csv
-//                       ? Icons.description_outlined
-//                       : Icons.edit_outlined,
-//               color: isDebit ? Colors.red.shade600 : Colors.green.shade700,
-//               size: 18,
-//             ),
-//           ),
-//           title: Text(
-//             expense.title,
-//             maxLines: 1,
-//             overflow: TextOverflow.ellipsis,
-//             style: const TextStyle(
-//                 fontWeight: FontWeight.w600,
-//                 fontSize: 14,
-//                 color: Color(0xFF0F172A)),
-//           ),
-//           subtitle: Row(
-//             children: [
-//               Flexible(
-//                 child: Text(
-//                   expense.category,
-//                   maxLines: 1,
-//                   overflow: TextOverflow.ellipsis,
-//                   style: const TextStyle(
-//                       fontSize: 11,
-//                       color: Color(0xFF64748B),
-//                       fontWeight: FontWeight.w500),
-//                 ),
-//               ),
-//               if (expense.accountLast4 != null) ...[
-//                 const Text(' • ', style: TextStyle(color: Color(0xFF94A3B8))),
-//                 Text('A/c *${expense.accountLast4}',
-//                     style: const TextStyle(
-//                         fontSize: 11, color: Color(0xFF64748B))),
-//               ],
-//               const Text(' • ', style: TextStyle(color: Color(0xFF94A3B8))),
-//               Text(dateFormat.format(expense.date),
-//                   style:
-//                       const TextStyle(fontSize: 11, color: Color(0xFF94A3B8))),
-//             ],
-//           ),
-//           trailing: Text(
-//             '${isDebit ? '-' : '+'} ${formatter.format(expense.amount)}',
-//             style: TextStyle(
-//               fontWeight: FontWeight.w700,
-//               fontSize: 14,
-//               color: isDebit ? Colors.red.shade700 : Colors.green.shade700,
-//             ),
-//           ),
-//         ),
-//       ),
-//     );
-//   }
-// }

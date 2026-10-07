@@ -1,4 +1,3 @@
-// lib/views/categories/categories_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/category_provider.dart';
@@ -12,66 +11,117 @@ class CategoriesScreen extends StatelessWidget {
     final provider = context.watch<CategoryProvider>();
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFC),
       appBar: AppBar(
-        title: const Text('Categories & Auto-Rules',
-            style: TextStyle(fontWeight: FontWeight.bold)),
+        title: const Text(
+          'Expense Categories ',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+        ),
       ),
-      body: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 140),
-        itemCount: provider.categories.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final cat = provider.categories[index];
-          return Card(
-            elevation: 0,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: const BorderSide(color: Color(0xFFE2E8F0)),
-            ),
-            child: ExpansionTile(
-              leading: CircleAvatar(
-                backgroundColor: cat.color.withOpacity(0.12),
-                child: Icon(cat.icon, color: cat.color, size: 20),
+      body: ListView(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 120),
+        children: [
+          // 2. Categories List Header
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              const Text(
+                'Category Match Rules',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Color(0xFF0F172A)),
               ),
-              title: Text(cat.name,
+              Text(
+                '${provider.categories.length} Categories',
+                style: const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+
+          // 3. Category Expansion Cards
+          ...provider.categories.map((cat) {
+            return Card(
+              elevation: 0,
+              margin: const EdgeInsets.only(bottom: 12),
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: Color(0xFFE2E8F0)),
+              ),
+              child: ExpansionTile(
+                shape: const Border(),
+                collapsedShape: const Border(),
+                leading: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: cat.color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(cat.icon, color: cat.color, size: 22),
+                ),
+                title: Text(
+                  cat.name,
                   style: const TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15)),
-              subtitle: Text('${cat.keywords.length} auto-match keywords',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey)),
-              childrenPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              children: [
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('SMS & Statement Match Keywords:',
-                      style:
-                          TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                      color: Color(0xFF0F172A)),
                 ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    ...cat.keywords.map((kw) => Chip(
-                          label: Text(kw, style: const TextStyle(fontSize: 11)),
-                          backgroundColor: const Color(0xFFF1F5F9),
-                          padding: EdgeInsets.zero,
-                          materialTapTargetSize:
-                              MaterialTapTargetSize.shrinkWrap,
-                        )),
-                    ActionChip(
-                      avatar: const Icon(Icons.add, size: 14),
-                      label: const Text('Add Rule',
-                          style: TextStyle(fontSize: 11)),
-                      onPressed: () => _showAddKeywordDialog(context, cat),
+                subtitle: Text(
+                  '${cat.keywords.length} keyword match rules',
+                  style:
+                      const TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                ),
+                childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                children: [
+                  const Divider(color: Color(0xFFF1F5F9), height: 1),
+                  const SizedBox(height: 12),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      'Matching Keywords & Merchant Handles:',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF334155)),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-              ],
-            ),
-          );
-        },
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      ...cat.keywords.map((kw) => Chip(
+                            label:
+                                Text(kw, style: const TextStyle(fontSize: 12)),
+                            backgroundColor: const Color(0xFFF1F5F9),
+                            side: const BorderSide(color: Color(0xFFE2E8F0)),
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            materialTapTargetSize:
+                                MaterialTapTargetSize.shrinkWrap,
+                          )),
+                      ActionChip(
+                        avatar: const Icon(Icons.add_rounded,
+                            size: 16, color: Color(0xFF1E3A8A)),
+                        label: const Text(
+                          'Add Rule',
+                          style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF1E3A8A)),
+                        ),
+                        backgroundColor: const Color(0xFFEFF6FF),
+                        side: const BorderSide(color: Color(0xFFBFDBFE)),
+                        onPressed: () => _showAddKeywordDialog(context, cat),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
       ),
       floatingActionButton: Padding(
         padding: const EdgeInsets.only(bottom: 76),
@@ -92,19 +142,52 @@ class CategoriesScreen extends StatelessWidget {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Add Keyword Rule to ${category.name}'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: 'e.g. "bigbasket" or "d-mart"',
-            labelText: 'Keyword',
-          ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: Row(
+          children: [
+            Icon(Icons.add_circle_outline_rounded,
+                color: category.color, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              'Add Rule to ${category.name}',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Enter a merchant keyword or UPI handle to automatically map incoming transactions to this category.',
+              style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+            ),
+            const SizedBox(height: 14),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: 'e.g. bigbasket, zepto, apollo',
+                labelText: 'Keyword',
+                filled: true,
+                fillColor: const Color(0xFFF8FAFC),
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
           FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFF1E3A8A),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
             onPressed: () {
               final kw = controller.text.trim();
               if (kw.isNotEmpty) {
@@ -114,7 +197,7 @@ class CategoriesScreen extends StatelessWidget {
                 Navigator.pop(ctx);
               }
             },
-            child: const Text('Add Rule'),
+            child: const Text('Save Rule'),
           ),
         ],
       ),
@@ -125,52 +208,210 @@ class CategoriesScreen extends StatelessWidget {
     final nameController = TextEditingController();
     final kwController = TextEditingController();
 
-    showDialog(
+    const colors = [
+      Color(0xFFEA580C),
+      Color(0xFF2563EB),
+      Color(0xFFDB2777),
+      Color(0xFF7C3AED),
+      Color(0xFF059669),
+      Color(0xFF0D9488),
+      Color(0xFFDC2626),
+      Color(0xFF4F46E5),
+    ];
+
+    const icons = [
+      Icons.restaurant_rounded,
+      Icons.directions_car_rounded,
+      Icons.shopping_bag_rounded,
+      Icons.movie_creation_rounded,
+      Icons.bolt_rounded,
+      Icons.trending_up_rounded,
+      Icons.fitness_center_rounded,
+      Icons.medical_services_rounded,
+      Icons.flight_rounded,
+      Icons.school_rounded,
+    ];
+
+    Color selectedColor = colors[0];
+    IconData selectedIcon = icons[0];
+
+    showModalBottomSheet(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Create New Category'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: 'Category Name'),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: kwController,
-              decoration: const InputDecoration(
-                labelText: 'Comma-separated Keywords',
-                hintText: 'e.g. medicine, pharmacy, apollo',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              final keywords = kwController.text
-                  .split(',')
-                  .map((e) => e.trim())
-                  .where((e) => e.isNotEmpty)
-                  .toList();
-              if (name.isNotEmpty) {
-                context.read<CategoryProvider>().addCategory(
-                      name,
-                      Icons.folder_outlined,
-                      Colors.indigo,
-                      keywords,
-                    );
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 24,
+                right: 24,
+                top: 24,
+                bottom: MediaQuery.of(ctx).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(2),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  const Text(
+                    'Create Custom Category',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: Color(0xFF0F172A)),
+                  ),
+                  const Text(
+                    'Define custom category styling and auto-match keyword rules',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                  ),
+                  const SizedBox(height: 18),
+                  TextField(
+                    controller: nameController,
+                    decoration: InputDecoration(
+                      labelText: 'Category Name',
+                      hintText: 'e.g. Fitness & Gym, Pet Care',
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Color Picker
+                  const Text('Select Theme Color:',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569))),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    children: colors.map((col) {
+                      final isSel = selectedColor == col;
+                      return GestureDetector(
+                        onTap: () => setModalState(() => selectedColor = col),
+                        child: Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: col,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSel ? Colors.black : Colors.transparent,
+                              width: 2.5,
+                            ),
+                          ),
+                          child: isSel
+                              ? const Icon(Icons.check,
+                                  color: Colors.white, size: 16)
+                              : null,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  // Icon Picker
+                  const Text('Select Category Icon:',
+                      style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF475569))),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 10,
+                    children: icons.map((ico) {
+                      final isSel = selectedIcon == ico;
+                      return GestureDetector(
+                        onTap: () => setModalState(() => selectedIcon = ico),
+                        child: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSel
+                                ? selectedColor.withOpacity(0.2)
+                                : const Color(0xFFF1F5F9),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: isSel ? selectedColor : Colors.transparent,
+                              width: 1.5,
+                            ),
+                          ),
+                          child: Icon(ico,
+                              size: 20,
+                              color: isSel
+                                  ? selectedColor
+                                  : const Color(0xFF64748B)),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+
+                  TextField(
+                    controller: kwController,
+                    decoration: InputDecoration(
+                      labelText: 'Auto-match Keywords (comma-separated)',
+                      hintText: 'e.g. cult, goldgym, whey, protein',
+                      filled: true,
+                      fillColor: const Color(0xFFF8FAFC),
+                      border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFF1E3A8A),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () {
+                        final name = nameController.text.trim();
+                        final keywords = kwController.text
+                            .split(',')
+                            .map((e) => e.trim())
+                            .where((e) => e.isNotEmpty)
+                            .toList();
+                        if (name.isNotEmpty) {
+                          context.read<CategoryProvider>().addCategory(
+                                name,
+                                selectedIcon,
+                                selectedColor,
+                                keywords,
+                              );
+                          Navigator.pop(ctx);
+                        }
+                      },
+                      child: const Text('Create Category',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold, fontSize: 15)),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

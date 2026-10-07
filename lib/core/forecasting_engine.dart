@@ -55,10 +55,14 @@ class ForecastingEngine {
   static MacroType classifyMacroCategory(String category) {
     final lower = category.toLowerCase();
     if (lower.contains('utilit') ||
+        lower.contains('bill') ||
         lower.contains('grocer') ||
         lower.contains('rent') ||
         lower.contains('fuel') ||
-        lower.contains('health')) {
+        lower.contains('travel') ||
+        lower.contains('health') ||
+        lower.contains('medical') ||
+        lower.contains('insurance')) {
       return MacroType.need;
     }
     return MacroType.want;

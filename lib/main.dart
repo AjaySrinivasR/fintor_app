@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 import 'package:fintor/providers/user_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'core/dynamic_sms_parser.dart';
 import 'providers/budget_provider.dart';
@@ -47,6 +48,15 @@ void main() async {
   await NotificationReminderService.init();
   final categoryProvider = CategoryProvider();
   await expenseProvider.initializeNotificationListener(categoryProvider);
+
+  // 6. Check SMS sync preference and initialize / drain offline queued SMS
+  final prefs = await SharedPreferences.getInstance();
+  final isSmsSyncEnabled = prefs.getBool('sms_sync_enabled') ?? false;
+  if (isSmsSyncEnabled) {
+    await expenseProvider.initializeSmsListener();
+  } else {
+    await expenseProvider.drainOfflineSms();
+  }
 
   runApp(
     MultiProvider(
@@ -106,8 +116,6 @@ class FintorApp extends StatelessWidget {
         ),
       ),
       home: canAccessHome ? const HomeNavScaffold() : const AuthScreen(),
-      // In lib/main.dart, temporarily bypass auth by setting home directly:
-      // home: const HomeNavScaffold(),
     );
   }
 }
