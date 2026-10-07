@@ -1,6 +1,7 @@
 import 'dart:io' show Platform;
 import 'package:fintor/providers/user_provider.dart';
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
@@ -94,17 +95,29 @@ class FintorApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,
+        fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
+        textTheme: GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData(brightness: Brightness.light).textTheme,
+        ),
+        primaryTextTheme: GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData(brightness: Brightness.light).primaryTextTheme,
+        ),
         colorScheme: ColorScheme.fromSeed(
           seedColor: const Color(0xFF1E3A8A),
           primary: const Color(0xFF1E3A8A),
           surface: const Color(0xFFF8FAFC),
         ),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        appBarTheme: const AppBarTheme(
+        appBarTheme: AppBarTheme(
           backgroundColor: Colors.white,
-          foregroundColor: Color(0xFF0F172A),
+          foregroundColor: const Color(0xFF0F172A),
           elevation: 0,
           scrolledUnderElevation: 1,
+          titleTextStyle: GoogleFonts.plusJakartaSans(
+            color: const Color(0xFF0F172A),
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         cardTheme: CardThemeData(
           color: Colors.white,

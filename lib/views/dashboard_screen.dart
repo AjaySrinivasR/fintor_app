@@ -864,42 +864,162 @@ class _DashboardScreenState extends State<DashboardScreen> {
         TextEditingController(text: provider.monthlyBudget.toStringAsFixed(0));
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('Set Monthly Budget Limit',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          keyboardType: TextInputType.number,
-          decoration: InputDecoration(
-            labelText: 'Total Monthly Limit',
-            prefixText: '₹ ',
-            filled: true,
-            fillColor: const Color(0xFFF8FAFC),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+      builder: (ctx) => StatefulBuilder(
+        builder: (context, setDialogState) => Dialog(
+          backgroundColor: Colors.white,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          elevation: 6,
+          insetPadding:
+              const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Padding(
+            padding: const EdgeInsets.all(22.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFEFF6FF),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(
+                        Icons.pie_chart_rounded,
+                        color: Color(0xFF1E3A8A),
+                        size: 22,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Monthly Budget Limit',
+                          style: GoogleFonts.plusJakartaSans(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 17,
+                            color: const Color(0xFF0F172A),
+                          ),
+                        ),
+                        const Text(
+                          'Overall monthly spending cap',
+                          style:
+                              TextStyle(fontSize: 12, color: Color(0xFF64748B)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                TextField(
+                  controller: controller,
+                  autofocus: true,
+                  keyboardType: TextInputType.number,
+                  style: GoogleFonts.plusJakartaSans(
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                    color: const Color(0xFF0F172A),
+                  ),
+                  decoration: InputDecoration(
+                    labelText: 'Total Monthly Limit',
+                    prefixText: '₹ ',
+                    prefixStyle: GoogleFonts.plusJakartaSans(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      color: const Color(0xFF1E3A8A),
+                    ),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(14),
+                      borderSide: const BorderSide(
+                          color: Color(0xFF1E3A8A), width: 1.5),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Quick Presets:',
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: Color(0xFF64748B),
+                      fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [15000, 25000, 35000, 50000, 75000].map((preset) {
+                    return ActionChip(
+                      label: Text('₹${NumberFormat.compact().format(preset)}'),
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      onPressed: () {
+                        setDialogState(() {
+                          controller.text = preset.toString();
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 22),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          side: const BorderSide(color: Color(0xFFCBD5E1)),
+                        ),
+                        onPressed: () => Navigator.pop(ctx),
+                        child: const Text('Cancel',
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF475569))),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: FilledButton(
+                        style: FilledButton.styleFrom(
+                          backgroundColor: const Color(0xFF1E3A8A),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                        onPressed: () {
+                          final budget =
+                              double.tryParse(controller.text.trim()) ??
+                                  provider.monthlyBudget;
+                          if (budget > 0) {
+                            provider.setBudget(budget);
+                            Navigator.pop(ctx);
+                          }
+                        },
+                        child: const Text('Save Limit',
+                            style: TextStyle(fontWeight: FontWeight.bold)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color(0xFF1E3A8A),
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () {
-              final budget = double.tryParse(controller.text.trim()) ??
-                  provider.monthlyBudget;
-              if (budget > 0) {
-                provider.setBudget(budget);
-                Navigator.pop(ctx);
-              }
-            },
-            child: const Text('Save Limit'),
-          ),
-        ],
       ),
     );
   }
@@ -907,33 +1027,85 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Future<void> _showLogoutDialog(BuildContext context) async {
     final shouldLogout = await showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Row(
-          children: [
-            Icon(Icons.logout_rounded, color: Colors.red),
-            SizedBox(width: 10),
-            Text('Log Out', style: TextStyle(fontWeight: FontWeight.bold)),
-          ],
-        ),
-        content: const Text(
-          'Are you sure you want to log out of Fintor? Your synced data is safely backed up.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        elevation: 6,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22.0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF1F2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.logout_rounded,
+                      color: Color(0xFFE11D48),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    'Log Out of Fintor',
+                    style: GoogleFonts.plusJakartaSans(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 17,
+                      color: const Color(0xFF0F172A),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Are you sure you want to log out? Your offline ledger and cloud account remain safely synced.',
+                style: TextStyle(
+                    fontSize: 13, color: Color(0xFF64748B), height: 1.4),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                        side: const BorderSide(color: Color(0xFFCBD5E1)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel',
+                          style: TextStyle(
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF475569))),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFE11D48),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12)),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Log Out',
+                          style: TextStyle(fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ),
-          FilledButton(
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.red.shade600,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Log Out'),
-          ),
-        ],
+        ),
       ),
     );
 
@@ -1184,23 +1356,119 @@ class _TransactionListTile extends StatelessWidget {
   Future<bool?> _confirmDelete(BuildContext context) async {
     return showDialog<bool>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Delete Transaction?'),
-        content: Text(
-          'Are you sure you want to delete "${expense.title}" for ${formatter.format(expense.amount)}?',
+      builder: (ctx) => Dialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        backgroundColor: Colors.white,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: Padding(
+          padding: const EdgeInsets.all(22),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFEE2E2),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.delete_outline_rounded,
+                      color: Color(0xFFDC2626),
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Delete Transaction?',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              RichText(
+                text: TextSpan(
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF64748B),
+                    height: 1.4,
+                  ),
+                  children: [
+                    const TextSpan(text: 'Are you sure you want to delete '),
+                    TextSpan(
+                      text: '"${expense.title}"',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF0F172A),
+                      ),
+                    ),
+                    const TextSpan(text: ' for '),
+                    TextSpan(
+                      text: formatter.format(expense.amount),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFDC2626),
+                      ),
+                    ),
+                    const TextSpan(text: '? This action cannot be undone.'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        side: const BorderSide(color: Color(0xFFE2E8F0)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text(
+                        'Cancel',
+                        style: TextStyle(
+                          color: Color(0xFF64748B),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFDC2626),
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text(
+                        'Delete',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red.shade700),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('Delete'),
-          ),
-        ],
       ),
     );
   }
@@ -1304,14 +1572,14 @@ class _TransactionListTile extends StatelessWidget {
                               Text(
                                 '*${expense.accountLast4}',
                                 style: const TextStyle(
-                                    fontSize: 11, color: Color(0xFF64748B)),
+                                    fontSize: 10, color: Color(0xFF64748B)),
                               ),
                             ],
                             const SizedBox(width: 6),
                             Text(
                               dateFormat.format(expense.date),
                               style: const TextStyle(
-                                  fontSize: 11, color: Color(0xFF94A3B8)),
+                                  fontSize: 10, color: Color(0xFF94A3B8)),
                             ),
                           ],
                         ),
